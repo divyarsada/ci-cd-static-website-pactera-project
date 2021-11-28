@@ -13,6 +13,7 @@ pipeline {
                    s3Upload(pathStyleAccessEnabled:true, payloadSigningEnabled: true, file:'index.html', bucket:'static-webapp-pactra-project')
                 }
             }
+        }
         
         stage("Deploy updated index.html file") {
            steps {
