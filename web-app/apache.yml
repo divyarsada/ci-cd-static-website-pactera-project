@@ -13,5 +13,5 @@
         enabled: True
     - name: Deploy static website
       copy:
-        src: index.html
+        src: web-app/index.html
         dest: /var/www/html/
