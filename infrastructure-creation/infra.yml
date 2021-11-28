@@ -1,0 +1,392 @@
+Parameters:
+    EnvironmentName:
+        Description: An environment name that will be prefixed to resource names
+        Type: String
+    VpcCIDR: 
+        Description: Please enter the IP range (CIDR notation) for this VPC
+        Type: String
+        Default: 10.0.0.0/16
+    PublicSubnet1CIDR:
+        Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+        Type: String
+        Default: 10.0.1.0/24
+    PublicSubnet2CIDR:
+        Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+        Type: String
+        Default: 10.0.2.0/24
+    PrivateSubnet1CIDR:
+        Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+        Type: String
+        Default: 10.0.3.0/24
+    PrivateSubnet2CIDR:
+        Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+        Type: String
+        Default: 10.0.4.0/24
+Resources:
+    VPC: 
+        Type: AWS::EC2::VPC
+        Properties:
+            CidrBlock: !Ref 'VpcCIDR'
+            EnableDnsHostnames: true
+            Tags: 
+                - Key: Name 
+                  Value: !Ref 'EnvironmentName'
+    PublicSubnet1: 
+        DependsOn: VPC
+        Type: AWS::EC2::Subnet
+        Properties:
+            VpcId: !Ref "VPC"
+            AvailabilityZone: !Select [ 0, !GetAZs '' ]
+            CidrBlock: !Ref 'PublicSubnet1CIDR'
+            MapPublicIpOnLaunch: true
+            Tags: 
+                - Key: Name 
+                  Value: !Sub ${EnvironmentName} Public Subnet (AZ1)
+    PublicSubnet2: 
+        DependsOn: VPC
+        Type: AWS::EC2::Subnet
+        Properties:
+            VpcId: !Ref "VPC"
+            AvailabilityZone: !Select [ 1, !GetAZs '' ]
+            CidrBlock: !Ref 'PublicSubnet2CIDR'
+            MapPublicIpOnLaunch: true
+            Tags: 
+                - Key: Name 
+                  Value: !Sub ${EnvironmentName} Public Subnet (AZ1)
+    PublicRouteTable:
+        DependsOn: PublicSubnet1
+        Type: AWS::EC2::RouteTable
+        Properties: 
+            VpcId: !Ref "VPC"
+            Tags: 
+                - Key: Name 
+                  Value: !Sub ${EnvironmentName} Public Routes (AZ1)
+    DefaultPublicRoute1:
+        DependsOn: PublicRouteTable
+        Type: AWS::EC2::Route
+        Properties:
+            RouteTableId: !Ref PublicRouteTable
+            DestinationCidrBlock: 0.0.0.0/0
+            GatewayId: !Ref 'VPCIGW'
+    PublicSubnet1RouteTableAssociation:
+        Type: AWS::EC2::SubnetRouteTableAssociation
+        Properties:
+            RouteTableId: !Ref 'PublicRouteTable'
+            SubnetId: !Ref "PublicSubnet1"
+    PublicSubnet2RouteTableAssociation:
+        Type: AWS::EC2::SubnetRouteTableAssociation
+        Properties:
+            RouteTableId: !Ref 'PublicRouteTable'
+            SubnetId: !Ref "PublicSubnet2"
+    PrivateSubnet1: 
+        DependsOn: "VPC"
+        Type: AWS::EC2::Subnet
+        Properties:
+            VpcId: !Ref "VPC"
+            AvailabilityZone: !Select [ 0, !GetAZs '' ]
+            CidrBlock: !Ref 'PrivateSubnet1CIDR'
+            MapPublicIpOnLaunch: false
+            Tags: 
+                - Key: Name 
+                  Value: !Sub ${EnvironmentName} Private Subnet (AZ1)
+    PrivateSubnet2: 
+        DependsOn: "VPC"
+        Type: AWS::EC2::Subnet
+        Properties:
+            VpcId: !Ref "VPC"
+            AvailabilityZone: !Select [ 1, !GetAZs '' ]
+            CidrBlock: !Ref 'PrivateSubnet2CIDR'
+            MapPublicIpOnLaunch: false
+            Tags: 
+                - Key: Name 
+                  Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
+    PrivateRouteTable:
+        DependsOn:
+          - "PrivateSubnet1"
+          - "PrivateSubnet2"
+        Type: AWS::EC2::RouteTable
+        Properties: 
+            VpcId: !Ref "VPC"
+            Tags: 
+                - Key: Name 
+                  Value: !Sub ${EnvironmentName} Private Routes (AZ1)
+    DefaultPrivateRoute1:
+        DependsOn: "PrivateRouteTable"
+        Type: AWS::EC2::Route
+        Properties:
+            RouteTableId: !Ref 'PrivateRouteTable'
+            DestinationCidrBlock: 0.0.0.0/0
+            NatGatewayId: !Ref 'NatGateway'
+
+    PrivateSubnet1RouteTableAssociation:
+        Type: AWS::EC2::SubnetRouteTableAssociation
+        Properties:
+            RouteTableId: !Ref 'PrivateRouteTable'
+            SubnetId: !Ref "PrivateSubnet1"
+
+    PrivateSubnet2RouteTableAssociation:
+        Type: AWS::EC2::SubnetRouteTableAssociation
+        Properties:
+            RouteTableId: !Ref 'PrivateRouteTable'
+            SubnetId: !Ref "PrivateSubnet2"
+
+    VPCIGW:
+        Type: AWS::EC2::InternetGateway
+        Properties: 
+            Tags: 
+                - Key: Name 
+                  Value: !Ref 'EnvironmentName'
+
+    InternetGatewayAttachment:
+        Type: AWS::EC2::VPCGatewayAttachment
+        Properties: 
+            InternetGatewayId: !Ref VPCIGW
+            VpcId: !Ref "VPC"
+    
+    NatGatewayEIP:
+        Type: AWS::EC2::EIP
+        DependsOn: InternetGatewayAttachment
+        Properties: 
+            Domain: vpc
+    
+    NatGateway: 
+        Type: AWS::EC2::NatGateway
+        Properties: 
+            AllocationId: !GetAtt NatGatewayEIP.AllocationId
+            SubnetId: !Ref "PublicSubnet1"
+    
+    BastionInstance:
+        Type: AWS::EC2::Instance
+        Properties:
+              ImageId: ami-04902260ca3d33422 
+              InstanceType: t2.micro
+              KeyName: tier-1
+              NetworkInterfaces: 
+                  - AssociatePublicIpAddress: "true"
+                    DeviceIndex: "0"
+                    GroupSet: 
+                      - Ref: "BastionSecurityGroup"
+                    SubnetId: 
+                      Ref: "PublicSubnet1"
+    BastionSecurityGroup:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+            VpcId: !Ref "VPC"
+            GroupDescription: "Allow HTTP/HTTPS and SSH inbound and outbound traffic"
+            SecurityGroupIngress:
+                - IpProtocol: tcp
+                  FromPort: 80
+                  ToPort: 80
+                  CidrIp: 0.0.0.0/0
+                - IpProtocol: tcp
+                  FromPort: 443
+                  ToPort: 443
+                  CidrIp: 0.0.0.0/0
+                - IpProtocol: tcp
+                  FromPort: 22
+                  ToPort: 22
+                  CidrIp: 0.0.0.0/0
+    
+    EC2Role:
+        Type: 'AWS::IAM::Role'
+        Properties:
+          AssumeRolePolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Principal:
+                  Service:
+                  - ec2.amazonaws.com
+                Action:
+                  - 'sts:AssumeRole'
+          Path: /
+          Policies:
+            - PolicyName: S3ReadonlyAccess
+              PolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                  - Effect: Allow
+                    Action: 
+                      - "s3:ListBucket"
+                      - "s3:GetObject*"
+                    Resource: '*'      
+            - PolicyName: SSMReadonlyAccess
+              PolicyDocument:
+                Version: 2012-10-17
+                Statement:
+                  - Effect: Allow
+                    Action: 
+                      - "ssm:GetParameters"
+                    Resource: '*'
+    
+    ProfileWithRolesForApp:
+        Type: AWS::IAM::InstanceProfile
+        Properties: 
+            Roles: 
+              - !Ref "EC2Role"
+              
+    WebServerSecGroup:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+            GroupDescription: Allow http to client host
+            VpcId: !Ref "VPC"
+            SecurityGroupIngress:
+                - IpProtocol: tcp
+                  FromPort: 80
+                  ToPort: 80
+                  CidrIp: 0.0.0.0/0
+            SecurityGroupEgress:
+                - IpProtocol: tcp
+                  FromPort: 0
+                  ToPort: 65535
+                  CidrIp: 0.0.0.0/0
+    LBSecGroup:
+        Type: AWS::EC2::SecurityGroup
+        Properties:
+            GroupDescription: Allow http to client host
+            VpcId: !Ref "VPC"
+            SecurityGroupIngress:
+                - IpProtocol: tcp
+                  FromPort: 80
+                  ToPort: 80
+                  CidrIp: 0.0.0.0/0
+            SecurityGroupEgress:
+                - IpProtocol: tcp
+                  FromPort: 80
+                  ToPort: 80
+                  CidrIp: !Ref 'VpcCIDR'
+            SecurityGroupIngress:
+                - IpProtocol: tcp
+                  FromPort: 22
+                  ToPort: 22
+                  SourceSecurityGroupId: !Ref 'BastionSecurityGroup'
+   
+    WebAppLaunchConfig:
+      Type: AWS::AutoScaling::LaunchConfiguration
+      Properties:
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            sudo yum update
+            sudo yum install -y httpd
+            sudo yum install unzip awscli -y
+            cd /var/www/html
+            aws s3 cp s3://static-webapp-pactra-project/index.html .
+            systemctl start httpd
+            secret=$(aws ssm get-parameter --name "DD_API_KEY")
+            DD_AGENT_MAJOR_VERSION=7 DD_API_KEY=$secret DD_SITE="datadoghq.com" bash -c "$(curl -L https://s3.amazonaws.com/dd-agent/scripts/install_script.sh)"
+            sudo systemctl start datadog-agent
+            sudo systemctl status datadog-agent
+            DD_INSTALL_ONLY=true
+        
+        IamInstanceProfile: !Ref 'ProfileWithRolesForApp'     
+        KeyName: tier-1
+        ImageId: ami-04902260ca3d33422
+        SecurityGroups:
+          - Ref: 'WebServerSecGroup'
+        InstanceType: t2.micro
+        BlockDeviceMappings:
+          - DeviceName: "/dev/sdk"
+            Ebs:
+               VolumeSize: '10'
+ 
+    AutoscalingGroup:
+      Type: AWS::AutoScaling::AutoScalingGroup
+      Properties: 
+        VPCZoneIdentifier:
+          - Ref: 'PrivateSubnet1'
+          - Ref: 'PrivateSubnet2'
+        LaunchConfigurationName: !Ref "WebAppLaunchConfig"
+        MaxSize: "4"
+        MinSize: "2"
+        TargetGroupARNs: 
+          - Ref: "WebAppTargetGroup"
+    WebAppLB:
+        Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+        Properties:
+            Subnets:
+              - Ref: 'PublicSubnet1'
+              - Ref: 'PublicSubnet2'
+            SecurityGroups:
+              - Ref: 'LBSecGroup'
+    Listener:
+        Type: AWS::ElasticLoadBalancingV2::Listener
+        Properties:
+            DefaultActions:
+                - Type: forward
+                  TargetGroupArn: !Ref 'WebAppTargetGroup'
+            LoadBalancerArn: !Ref "WebAppLB"
+            Port: '80'
+            Protocol: HTTP
+    ALBListenerRule:
+        Type: AWS::ElasticLoadBalancingV2::ListenerRule
+        Properties:
+            Actions:
+            - Type: forward
+              TargetGroupArn: !Ref "WebAppTargetGroup"
+            Conditions:
+            - Field: path-pattern
+              Values: [/]
+            ListenerArn: !Ref 'Listener'
+            Priority: 1
+    WebAppTargetGroup:
+        Type: AWS::ElasticLoadBalancingV2::TargetGroup
+        Properties:
+            HealthCheckIntervalSeconds: 35
+            HealthCheckPath: /
+            HealthCheckProtocol: HTTP
+            HealthCheckTimeoutSeconds: 30
+            HealthyThresholdCount: 2
+            Port: 80
+            Protocol: HTTP
+            UnhealthyThresholdCount: 5
+            VpcId: !Ref "VPC"
+        
+Outputs:
+    VPC: 
+        Description: A reference to the created VPC
+        Value: !Ref VPC
+        Export:
+          Name: !Sub ${EnvironmentName}-VPCID
+    PrivateSubnets:
+        Description: A list of the private subnets
+        Value: !Join [ ",", [ !Ref PrivateSubnet1, !Ref PrivateSubnet2 ]]
+        Export:
+          Name: !Sub ${EnvironmentName}-PRI-NETS
+    PublicSubnets:
+        Description: A list of the public subnets
+        Value: !Join [ ",", [ !Ref PublicSubnet1, !Ref PublicSubnet2 ]]
+        Export:
+          Name: !Sub ${EnvironmentName}-PUB-NETS  
+    PublicRouteTable:
+        Description: Public route table information
+        Value: !Ref PublicRouteTable
+        Export:
+          Name: !Sub ${EnvironmentName}-PUB-RT
+    PrivateRouteTable:
+        Description: Public route table information
+        Value: !Ref PrivateRouteTable
+        Export:
+          Name: !Sub ${EnvironmentName}-PRI-RT
+    NatGateway:
+        Description: NAT table information
+        Value: !Ref NatGateway
+        Export:
+          Name: !Sub ${EnvironmentName}-NAT
+    LaunchConfiguration:
+        Description: Launchconfiguration Detail
+        Value: !Ref WebAppLaunchConfig
+        Export:
+          Name: !Sub ${EnvironmentName}-LAUNCH-CONFIG
+    AutoscalingGRP:
+        Description: ASG
+        Value: !Ref AutoscalingGroup
+        Export:
+          Name: !Sub ${EnvironmentName}-ASG
+    ExternalUrl:
+        Description: The url of the external load balancer
+        Value: !Join ['', ['http://', !GetAtt 'WebAppLB.DNSName']]
+        Export:
+          Name: !Sub ${EnvironmentName}-LBURL
+
+    
