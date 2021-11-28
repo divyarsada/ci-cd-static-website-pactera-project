@@ -10,7 +10,7 @@ pipeline {
          stage('Upload updated index.html to AWS S3 bucket') {
             steps {
                 withAWS(region:'us-east-1',credentials:'AWS-creds') {
-                   s3Upload(pathStyleAccessEnabled:true, payloadSigningEnabled: true, file:'index.html', bucket:'static-webapp-pactra-project')
+                   s3Upload(pathStyleAccessEnabled:true, payloadSigningEnabled: true, file:'/web-app/index.html', bucket:'static-webapp-pactra-project')
                 }
             }
         }
