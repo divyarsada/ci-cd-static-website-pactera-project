@@ -74,7 +74,7 @@ The resources to be created are as follows:
 Save, commit, and push. Within minutes, a new run should appear
 
 
-To verify, go to the URL where the static S3 website is: `http://<loadbalancer-dns-name>:80` 
+To verify, go to the URL: `http://<loadbalancer-dns-name>:80` 
 
 Steps to install Terraform and datadog-aws integration
 
