@@ -301,6 +301,54 @@ Resources:
         MinSize: "2"
         TargetGroupARNs: 
           - Ref: "WebAppTargetGroup"
+    
+    WebAppScaleUpPolicy:
+        Type: AWS::AutoScaling::ScalingPolicy
+        Properties:
+          AdjustmentType: ChangeInCapacity
+          PolicyType: SimpleScaling
+          AutoScalingGroupName: !Ref 'AutoscalingGroup'
+          Cooldown: '60'
+          ScalingAdjustment: 1
+    WebAppScaleDownPolicy:
+        Type: AWS::AutoScaling::ScalingPolicy
+        Properties:
+          AdjustmentType: ChangeInCapacity
+          PolicyType: SimpleScaling
+          AutoScalingGroupName: !Ref 'AutoscalingGroup'
+          Cooldown: '60'
+          ScalingAdjustment: -1
+    CPUAlarmHigh:
+        Type: AWS::CloudWatch::Alarm
+        Properties:
+          AlarmDescription: Scale-up if CPU > 50% for 5 minutes
+          MetricName: CPUUtilization
+          Namespace: AWS/EC2
+          Statistic: Average
+          Period: 300
+          EvaluationPeriods: 2
+          Threshold: 50
+          AlarmActions: [!Ref 'WebAppScaleUpPolicy']
+          Dimensions:
+          - Name: AutoScalingGroupName
+            Value: !Ref 'AutoscalingGroup'
+          ComparisonOperator: GreaterThanThreshold
+    CPUAlarmLow:
+        Type: AWS::CloudWatch::Alarm
+        Properties:
+          AlarmDescription: Scale-down if CPU < 30% for 5 minutes
+          MetricName: CPUUtilization
+          Namespace: AWS/EC2
+          Statistic: Average
+          Period: 300
+          EvaluationPeriods: 2
+          Threshold: 30
+          AlarmActions: [!Ref 'WebAppScaleDownPolicy']
+          Dimensions:
+          - Name: AutoScalingGroupName
+            Value: !Ref 'AutoscalingGroup'
+          ComparisonOperator: LessThanThreshold
+      
     WebAppLB:
         Type: AWS::ElasticLoadBalancingV2::LoadBalancer
         Properties:

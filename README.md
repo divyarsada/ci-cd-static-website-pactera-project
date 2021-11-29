@@ -15,6 +15,7 @@ The resources to be created are as follows:
 * Route table that defines the set the routing rules for the the incoming and outgoing network traffic. Subnets are associated with the route table. 
 * NAT Gateway placed in public subnet to access the application hosted on the server in private subnet
 * Launch Configuration for the application servers in order to deploy two servers, each located in  the private subnets. The launch configuration will be used by an auto-scaling group
+* Autoscaling policies are set on cpu utilization.
 * S3 bucket where the static index.html code is present, the path of the s3 bucket is specified in the user data field while defining the launch configuration 
 * IAM role that allows the instances to use the S3 Service and access the SSM parameter store.
 * Bastion server is present in the public subnet,on which Jenkins is installed. This Jenkins server is used for settin up the  pipeline jobs for ci/cd process.
