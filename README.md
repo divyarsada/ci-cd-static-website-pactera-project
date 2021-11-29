@@ -1,4 +1,4 @@
-# ci-cd-host-static-website-pactra-project
+# ci-cd-host-static-website-pactera-project
 
 ### Project Overview
 
