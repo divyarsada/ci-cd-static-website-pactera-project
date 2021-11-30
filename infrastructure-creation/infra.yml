@@ -234,7 +234,12 @@ Resources:
                 - IpProtocol: tcp
                   FromPort: 80
                   ToPort: 80
-                  CidrIp: 0.0.0.0/0
+                  SourceSecurityGroupId: !Ref 'LBSecGroup'
+            SecurityGroupIngress:
+                - IpProtocol: tcp
+                  FromPort: 22
+                  ToPort: 22
+                  SourceSecurityGroupId: !Ref 'BastionSecurityGroup'
             SecurityGroupEgress:
                 - IpProtocol: tcp
                   FromPort: 0
@@ -255,12 +260,6 @@ Resources:
                   FromPort: 80
                   ToPort: 80
                   CidrIp: !Ref 'VpcCIDR'
-            SecurityGroupIngress:
-                - IpProtocol: tcp
-                  FromPort: 22
-                  ToPort: 22
-                  SourceSecurityGroupId: !Ref 'BastionSecurityGroup'
-   
     WebAppLaunchConfig:
       Type: AWS::AutoScaling::LaunchConfiguration
       Properties:
